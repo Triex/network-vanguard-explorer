@@ -11,8 +11,8 @@ The explorer provides a comprehensive and easy to use interface for LUKSO's Vang
 The explorer is built using golang and utilizes a PostgreSQL database for storing and indexing data. In order to avoid the situation we currently have with the Eth1 chain where closed source block explorers dominate the market we decided to make our explorer open source and available for everybody.
 
 ### LUKSO Testnet Explorers
-[Vanguard](https://explorer.vanguard.l15.lukso.network/)
-[Pandora](https://explorer.pandora.l15.lukso.network/)
+- [Vanguard](https://explorer.vanguard.l15.lukso.network/)
+- [Pandora](https://explorer.pandora.l15.lukso.network/)
 
 ### Eth 2.0 Testnet Explorers
 

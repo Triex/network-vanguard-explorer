@@ -302,6 +302,12 @@ type ValidatorPageData struct {
 	DepositsCount                       uint64
 	SlashingsCount                      uint64
 	PendingCount                        uint64
+	SyncCount                           uint64
+	ScheduledSyncCount                  uint64
+	ParticipatedSyncCount               uint64
+	MissedSyncCount                     uint64
+	OrphanedSyncCount                   uint64
+	UnmissedSyncPercentage              float64 // missed/(participated+orphaned)
 	Income1d                            int64
 	Income7d                            int64
 	Income31d                           int64
@@ -372,6 +378,9 @@ type ValidatorStatsTableRow struct {
 	ProposerSlashings      sql.NullInt64 `db:"proposer_slashings"`
 	Deposits               sql.NullInt64 `db:"deposits"`
 	DepositsAmount         sql.NullInt64 `db:"deposits_amount"`
+	ParticipatedSync       sql.NullInt64 `db:"participated_sync"`
+	MissedSync             sql.NullInt64 `db:"missed_sync"`
+	OrphanedSync           sql.NullInt64 `db:"orphaned_sync"`
 }
 
 type ChartDataPoint struct {
@@ -447,6 +456,13 @@ type ValidatorAttestation struct {
 	InclusionSlot  uint64 `db:"inclusionslot"`
 	Delay          int64  `db:"delay"`
 	// EarliestInclusionSlot uint64 `db:"earliestinclusionslot"`
+}
+
+// ValidatorSyncParticipation hold information about sync-participation of a validator
+type ValidatorSyncParticipation struct {
+	Period uint64 `db:"period"`
+	Slot   uint64 `db:"slot"`
+	Status uint64 `db:"status"`
 }
 
 // type AvgInclusionDistance struct {
@@ -529,6 +545,7 @@ type BlockPageData struct {
 	VotingValidatorsCount  uint64
 	Mainnet                bool
 
+	SyncCommittee     []uint64
 	Attestations      []*BlockPageAttestation // Attestations included in this block
 	VoluntaryExits    []*BlockPageVoluntaryExits
 	Votes             []*BlockVote // Attestations that voted for that block
@@ -551,9 +568,9 @@ func (u *BlockPageData) MarshalJSON() ([]byte, error) {
 
 // BlockVote stores a vote for a given block
 type BlockVote struct {
-	Validator      uint64
-	IncludedIn     uint64
-	CommitteeIndex uint64
+	Validator      uint64 `db:"validator"`
+	IncludedIn     uint64 `db:"included_in"`
+	CommitteeIndex uint64 `db:"committee_index"`
 }
 
 // BlockPageMinMaxSlot is a struct to hold min/max slot data
@@ -678,13 +695,14 @@ type EpochPageData struct {
 
 	Blocks []*IndexPageDataBlocks
 
-	Ts             time.Time
-	NextEpoch      uint64
-	PreviousEpoch  uint64
-	ProposedCount  uint64
-	MissedCount    uint64
-	ScheduledCount uint64
-	OrphanedCount  uint64
+	SyncParticipationRate float64
+	Ts                    time.Time
+	NextEpoch             uint64
+	PreviousEpoch         uint64
+	ProposedCount         uint64
+	MissedCount           uint64
+	ScheduledCount        uint64
+	OrphanedCount         uint64
 }
 
 // EpochPageMinMaxSlot is a struct for the min/max epoch data
@@ -996,6 +1014,27 @@ type UserNotificationsPageData struct {
 	DashboardLink      string   `json:"dashboardLink"`
 	AuthData
 	// Subscriptions []*Subscription
+}
+
+type UserNotificationsCenterPageData struct {
+	AuthData
+	Metrics                 interface{}                          `json:"metrics"`
+	Validators              []UserValidatorNotificationTableData `json:"validators"`
+	Network                 interface{}                          `json:"network"`
+	MonitoringSubscriptions []Subscription                       `json:"monitoring_subscriptions"`
+	Machines                []string
+	DashboardLink           string `json:"dashboardLink"`
+	// Subscriptions []*Subscription
+}
+
+type UserValidatorNotificationTableData struct {
+	Index        uint64
+	Pubkey       string
+	Notification []struct {
+		Notification string
+		Timestamp    uint64
+		Threshold    string
+	}
 }
 
 type AdvertiseWithUsPageData struct {

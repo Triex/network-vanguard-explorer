@@ -119,14 +119,14 @@
 							{{template "validatorIncomeTable" $}}
 						{{end}}
 					</div>
-				</div>					
+				</div>
 			</div>
 			<div class="row align-items-stretch">
 				<div class="col-lg-8 px-lg-2 my-2">
 					<div class="card h-100 px-0 py-0 card-body">
 						<ul style="margin-top: -1px;margin-left:-1px;" class="nav nav-tabs" id="chartTabs" role="tablist">
 							<li class="nav-item">
-								<a class="nav-link active" id="charts-tab" data-toggle="tab" href="#charts" role="tab" aria-controls="charts-tab-content" aria-selected="false">
+								<a class="nav-link {{if .IncomeHistoryChartData}}active{{else}}disabled{{end}}" id="charts-tab" data-toggle="tab" href="#charts" role="tab" aria-controls="charts-tab-content" aria-selected="false">
 									<i class="tab-icon mr-md-2 fas fa-chart-bar"></i>
 									<span class="tab-text">Charts</span>
 								</a>
@@ -138,6 +138,9 @@
 								<a class="nav-link {{ if eq .AttestationsCount 0 }}disabled{{end}}" id="attestations-tab" data-toggle="tab" href="#attestations" role="tab" aria-controls="attestations" aria-selected="false"><i class="tab-icon mr-md-1 fas fa-file-signature"></i><span class="tab-text">Attestations</span></a>
 							</li>
 							<li class="nav-item">
+								<a class="nav-link {{ if eq .SyncCount 0 }}disabled{{end}}" id="sync-tab" data-toggle="tab" href="#sync" role="tab" aria-controls="sync" aria-selected="false"><i class="tab-icon mr-md-1 fas fa-sync"></i><span class="tab-text">Sync</span></a>
+							</li>
+							<li class="nav-item">
 								<a class="nav-link {{if eq .SlashingsCount 0}}disabled{{end}}" id="slashings-tab" data-toggle="tab" href="#slashings" role="tab" aria-controls="slashings" aria-selected="false"><i class="tab-icon mr-md-1 fas fa-user-slash"></i><span class="tab-text">Slashings</span></a>
 							</li>
 							<li class="nav-item">
@@ -147,7 +150,7 @@
 								<li class="nav-item">
 									<a class="nav-link" id="rocketpool-tab" data-toggle="tab" href="#rocketpool" role="tab" aria-controls="rocketpool" aria-selected="false">
 										<i class="tab-icon mr-md-1 fas fa-rocket"></i>
-										<span class="tab-text">Rocketpool</span>
+										<span class="tab-text">Rocket Pool</span>
 									</a>
 								</li>
 							{{end}}
@@ -173,6 +176,11 @@
 							{{if gt .AttestationsCount 0}}
 								 <div class="tab-pane fade h-100" id="attestations" role="tabpanel" aria-labelledby="attestations-tab" aria-controls="attestations">
 									{{template "validatorAttestationsTable" .}}
+								</div>
+							{{end}}
+							{{if gt .SyncCount 0}}
+								 <div class="tab-pane fade h-100" id="sync" role="tabpanel" aria-labelledby="sync-tab" aria-controls="sync">
+									{{template "validatorSyncTable" .}}
 								</div>
 							{{end}}
 							{{if gt .SlashingsCount 0}}

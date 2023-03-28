@@ -21,6 +21,10 @@ table {
   table-layout: auto;
 }
 
+.white-space-normal {
+  white-space: normal;
+}
+
 .btn-icon-inside {
   position: relative;
   line-height: 0;
@@ -369,4 +373,9 @@ table {
   .navbar .nav-item img {
     display: none;
   }
+}
+
+
+label.btn.btn-light:hover {
+  color: var(--font-color);
 }

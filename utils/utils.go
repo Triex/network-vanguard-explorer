@@ -33,6 +33,8 @@ import (
 
 	"github.com/kataras/i18n"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 )
 
 // Config is the globally accessible configuration
@@ -72,6 +74,7 @@ func GetTemplateFuncs() template.FuncMap {
 		"formatGraffiti":                          FormatGraffiti,
 		"formatHash":                              FormatHash,
 		"formatBitlist":                           FormatBitlist,
+		"formatBitvectorValidators":               formatBitvectorValidators,
 		"formatParticipation":                     FormatParticipation,
 		"formatIncome":                            FormatIncome,
 		"formatMoney":                             FormatMoney,
@@ -85,6 +88,7 @@ func GetTemplateFuncs() template.FuncMap {
 		"formatPercentageWithPrecision":           FormatPercentageWithPrecision,
 		"formatPercentageWithGPrecision":          FormatPercentageWithGPrecision,
 		"formatPercentageColored":                 FormatPercentageColored,
+		"formatPercentageColoredEmoji":            FormatPercentageColoredEmoji,
 		"formatPublicKey":                         FormatPublicKey,
 		"formatSlashedValidator":                  FormatSlashedValidator,
 		"formatSlashedValidatorInt64":             FormatSlashedValidatorInt64,
@@ -163,17 +167,42 @@ func fixUtf(r rune) rune {
 	return r
 }
 
-// EpochOfSlot will return the corresponding epoch of a slot
+func SyncPeriodOfEpoch(epoch uint64) uint64 {
+	if epoch < Config.Chain.AltairForkEpoch {
+		return 0
+	}
+	return epoch / Config.Chain.EpochsPerSyncCommitteePeriod
+}
+
+func FirstEpochOfSyncPeriod(syncPeriod uint64) uint64 {
+	return syncPeriod * Config.Chain.EpochsPerSyncCommitteePeriod
+}
+
+func TimeToSyncPeriod(t time.Time) uint64 {
+	return SyncPeriodOfEpoch(uint64(TimeToEpoch(t)))
+}
+
+// EpochOfSlot returns the corresponding epoch of a slot
 func EpochOfSlot(slot uint64) uint64 {
 	return slot / Config.Chain.SlotsPerEpoch
 }
 
-// SlotToTime will return a time.Time to slot
+// DayOfSlot returns the corresponding day of a slot
+func DayOfSlot(slot uint64) uint64 {
+	return Config.Chain.SecondsPerSlot * slot / (24 * 3600)
+}
+
+// WeekOfSlot returns the corresponding week of a slot
+func WeekOfSlot(slot uint64) uint64 {
+	return Config.Chain.SecondsPerSlot * slot / (7 * 24 * 3600)
+}
+
+// SlotToTime returns a time.Time to slot
 func SlotToTime(slot uint64) time.Time {
 	return time.Unix(int64(Config.Chain.GenesisTimestamp+slot*Config.Chain.SecondsPerSlot), 0)
 }
 
-// TimeToSlot will return time to slot in seconds
+// TimeToSlot returns time to slot in seconds
 func TimeToSlot(timestamp uint64) uint64 {
 	if Config.Chain.GenesisTimestamp > timestamp {
 		return 0
@@ -220,7 +249,48 @@ func ReadConfig(cfg *types.Config, path string) error {
 	}
 
 	readConfigEnv(cfg)
-	return readConfigSecrets(cfg)
+	err = readConfigSecrets(cfg)
+	if err != nil {
+		return err
+	}
+
+	// decode phase0 config
+	if len(cfg.Chain.Phase0Path) == 0 {
+		cfg.Chain.Phase0Path = "config/phase0.yml"
+	}
+	phase0 := &types.Phase0{}
+	f, err := os.Open(cfg.Chain.Phase0Path)
+	if err != nil {
+		logrus.Errorf("error opening Phase0 Config file %v: %v", cfg.Chain.Phase0Path, err)
+	} else {
+		decoder := yaml.NewDecoder(f)
+		err = decoder.Decode(phase0)
+		if err != nil {
+			logrus.Errorf("error decoding Phase0 Config file %v: %v", cfg.Chain.Phase0Path, err)
+		} else {
+			cfg.Chain.Phase0 = *phase0
+		}
+	}
+
+	// decode altair config
+	if len(cfg.Chain.AltairPath) == 0 {
+		cfg.Chain.AltairPath = "config/altair.yml"
+	}
+	altair := &types.Altair{}
+	f, err = os.Open(cfg.Chain.AltairPath)
+	if err != nil {
+		logrus.Errorf("error opening altair config file %v: %v", cfg.Chain.AltairPath, err)
+	} else {
+		decoder := yaml.NewDecoder(f)
+		err = decoder.Decode(altair)
+		if err != nil {
+			logrus.Errorf("error decoding altair Config file %v: %v", cfg.Chain.AltairPath, err)
+		} else {
+			cfg.Chain.Altair = *altair
+		}
+	}
+
+	return nil
 }
 
 func readConfigFile(cfg *types.Config, path string) error {
@@ -338,7 +408,6 @@ func SqlRowsToJSON(rows *sql.Rows) ([]interface{}, error) {
 		scanArgs := make([]interface{}, count)
 
 		for i, v := range columnTypes {
-			//log.Printf("name: %v, type: %v", v.Name(), v.DatabaseTypeName())
 			switch v.DatabaseTypeName() {
 			case "VARCHAR", "TEXT", "UUID":
 				scanArgs[i] = new(sql.NullString)
@@ -354,6 +423,9 @@ func SqlRowsToJSON(rows *sql.Rows) ([]interface{}, error) {
 				break
 			case "TIMESTAMP":
 				scanArgs[i] = new(sql.NullTime)
+				break
+			case "_INT4", "_INT8":
+				scanArgs[i] = new(pq.Int64Array)
 				break
 			default:
 				scanArgs[i] = new(sql.NullString)
@@ -510,4 +582,21 @@ func ValidateReCAPTCHA(recaptchaResponse string) (bool, error) {
 	}
 
 	return false, fmt.Errorf("Score too low threshold not reached, Score: %v - Required >0.5; %v", googleResponse.Score, err)
+}
+
+func BitAtVector(b []byte, i int) bool {
+	bb := b[i/8]
+	return (bb & (1 << uint(i%8))) > 0
+}
+
+func BitAtVectorReversed(b []byte, i int) bool {
+	bb := b[i/8]
+	return (bb & (1 << uint(7-(i%8)))) > 0
+}
+
+func GetNetwork() string {
+	if Config.Chain.Network != "" {
+		return strings.ToLower(Config.Chain.Network)
+	}
+	return strings.ToLower(Config.Chain.Phase0.ConfigName)
 }

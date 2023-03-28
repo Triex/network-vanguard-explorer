@@ -113,6 +113,25 @@ CREATE TABLE attestation_assignments_7 PARTITION OF attestation_assignments_p FO
 CREATE TABLE attestation_assignments_8 PARTITION OF attestation_assignments_p FOR VALUES IN (8);
 CREATE TABLE attestation_assignments_9 PARTITION OF attestation_assignments_p FOR VALUES IN (9);
 
+drop table if exists sync_assignments_p;
+create table sync_assignments_p
+(
+    slot           int not null,
+    validatorindex int not null,
+    status         int not null, /* Can be 0 = scheduled, 1 = executed, 2 = missed, 3 = orphaned */
+    week           int not null,
+    primary key (validatorindex, week, slot)
+) PARTITION BY LIST (week);
+
+drop table if exists sync_committees;
+create table sync_committees
+(
+    period         int not null,
+    validatorindex int not null,
+    committeeindex int not null,
+    primary key (period, validatorindex, committeeindex)
+);
+
 drop table if exists validator_balances_p;
 create table validator_balances_p
 (
@@ -145,6 +164,7 @@ create table validator_balances_recent
 );
 create index idx_validator_balances_recent_epoch on validator_balances_recent (epoch);
 create index idx_validator_balances_recent_validatorindex on validator_balances_recent (validatorindex);
+create index idx_validator_balances_recent_balance on validator_balances_recent (balance);
 
 drop table if exists validator_stats;
 create table validator_stats
@@ -161,6 +181,9 @@ create table validator_stats
     max_effective_balance   bigint,
     missed_attestations     int,
     orphaned_attestations   int,
+    participated_sync       int,
+    missed_sync             int,
+    orphaned_sync           int,
     proposed_blocks         int,
     missed_blocks           int,
     orphaned_blocks         int,
@@ -271,6 +294,7 @@ create table blocks
 create index idx_blocks_proposer on blocks (proposer);
 create index idx_blocks_epoch on blocks (epoch);
 create index idx_blocks_graffiti_text on blocks using gin (graffiti_text gin_trgm_ops);
+create index idx_blocks_blockrootstatus on blocks (blockroot, status);
 
 drop table if exists blocks_proposerslashings;
 create table blocks_proposerslashings
@@ -823,4 +847,27 @@ create table rocketpool_dao_members
     unbonded_validator_count int not null,
 
     primary key(rocketpool_storage_address, address)
+);
+
+drop table if exists rocketpool_network_stats;
+create table rocketpool_network_stats
+(
+    id 				    bigserial,
+    ts timestamp without time zone not null,
+    rpl_price  numeric not null,
+    claim_interval_time interval not null,
+    claim_interval_time_start timestamp without time zone not null, 
+    current_node_fee float not null, 
+    current_node_demand numeric not null, 
+    reth_supply numeric not null, 
+    effective_rpl_staked numeric not null, 
+    node_operator_rewards numeric not null,
+    reth_exchange_rate float not null,
+    node_count numeric not null, 
+    minipool_count numeric not null, 
+    odao_member_count numeric not null,
+    total_eth_staking numeric not null, 
+    total_eth_balance numeric not null,
+
+    primary key(id)
 );
